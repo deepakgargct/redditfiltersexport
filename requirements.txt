@@ -1,0 +1,6 @@
+streamlit
+praw
+pandas
+altair
+matplotlib
+wordcloud
