@@ -103,6 +103,7 @@ if st.button("Fetch Posts") and keyword:
             with col2:
                 comment_input = st.text_input("Comment count (number only)", value="")
 
+            # Apply comment filter
             if comment_input.isdigit():
                 threshold = int(comment_input)
                 if op == "=":
