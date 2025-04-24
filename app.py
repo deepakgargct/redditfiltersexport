@@ -7,7 +7,7 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import re
 
-# === Reddit API Setup ===
+# === Reddit API Setup using st.secrets ===
 reddit = praw.Reddit(
     client_id=st.secrets["client_id"],
     client_secret=st.secrets["client_secret"],
@@ -19,7 +19,7 @@ reddit.read_only = True
 def is_internal_link(post):
     return (not post.is_self and 'reddit.com' in post.url) or post.is_self
 
-def get_reddit_posts(keyword, start_date, end_date, subreddits=None):
+def get_reddit_posts(keyword, start_date, end_date, subreddits=None, comment_filter=None):
     posts = []
     query = f'title:"{keyword}"'
     target_subreddits = subreddits if subreddits else ["all"]
@@ -32,9 +32,15 @@ def get_reddit_posts(keyword, start_date, end_date, subreddits=None):
                 if start_date <= created <= end_date and is_internal_link(submission):
                     title_lower = submission.title.lower()
                     if keyword.lower() in title_lower:
+                        # Comment count filter
+                        if comment_filter:
+                            operator, value = comment_filter
+                            if operator == ">" and not (submission.num_comments > value):
+                                continue
+                            elif operator == "<" and not (submission.num_comments < value):
+                                continue
                         posts.append({
                             "Title": submission.title,
-                            "Body": submission.selftext if submission.is_self else "",
                             "Score": submission.score,
                             "Upvote Ratio": submission.upvote_ratio,
                             "Comments": submission.num_comments,
@@ -50,7 +56,7 @@ def get_reddit_posts(keyword, start_date, end_date, subreddits=None):
 
 def generate_wordcloud(titles):
     text = ' '.join(titles)
-    text = re.sub(r"http\S+|[^A-Za-z\s]", "", text)
+    text = re.sub(r"http\S+|[^A-Za-z\s]", "", text)  # Clean links and special chars
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
     return wordcloud
 
@@ -70,54 +76,43 @@ if len(selected_subreddits) > 5:
     st.error("You can specify a maximum of 5 subreddits.")
     selected_subreddits = selected_subreddits[:5]
 
-# === Date Range ===
-st.markdown("### 📆 Custom Date Range")
+# === Date Range Filter ===
+st.markdown("### 📅 Filter by Date Range")
 col3, col4 = st.columns(2)
 with col3:
-    start_date = st.date_input("Start Date", value=datetime.utcnow() - timedelta(days=30))
+    start_date = st.date_input("Start date", datetime.today() - timedelta(days=30))
 with col4:
-    end_date = st.date_input("End Date", value=datetime.utcnow())
+    end_date = st.date_input("End date", datetime.today())
 
-# === Fetch Posts ===
+# === Comment Count Filter ===
+st.markdown("### 💬 Filter by Number of Comments")
+col5, col6 = st.columns(2)
+with col5:
+    comment_operator = st.selectbox("Operator", options=[None, ">", "<"])
+with col6:
+    comment_value = st.number_input("Number of Comments", min_value=0, step=1, value=0)
+
+comment_filter = None
+if comment_operator and comment_value:
+    comment_filter = (comment_operator, comment_value)
+
+# === Fetch and Display ===
 if st.button("Fetch Posts") and keyword:
     with st.spinner("Fetching top Reddit posts..."):
         posts_data = get_reddit_posts(
-            keyword=keyword,
+            keyword,
             start_date=datetime.combine(start_date, datetime.min.time()),
             end_date=datetime.combine(end_date, datetime.max.time()),
-            subreddits=selected_subreddits
+            subreddits=selected_subreddits,
+            comment_filter=comment_filter
         )
         if posts_data:
             df = pd.DataFrame(posts_data)
 
-            # === Filter by Subreddit ===
+            # === Subreddit Filter ===
             subreddits = df["Subreddit"].unique().tolist()
             selected_subs = st.multiselect("Filter by Subreddit", subreddits, default=subreddits)
             df = df[df["Subreddit"].isin(selected_subs)]
-
-            # === Filter by Comments ===
-            st.markdown("### 💬 Filter by Number of Comments")
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                op = st.selectbox("Operator", options=["=", "<", "<=", ">", ">="])
-            with col2:
-                comment_input = st.text_input("Comment count (number only)", value="")
-
-            # Apply comment filter only if input is a valid number
-            if comment_input.isdigit():
-                threshold = int(comment_input)
-                if op == "=":
-                    df = df[df["Comments"] == threshold]
-                elif op == "<":
-                    df = df[df["Comments"] < threshold]
-                elif op == "<=":
-                    df = df[df["Comments"] <= threshold]
-                elif op == ">":
-                    df = df[df["Comments"] > threshold]
-                elif op == ">=":
-                    df = df[df["Comments"] >= threshold]
-            elif comment_input:
-                st.warning("Please enter a valid integer for comment count.")
 
             # === Sorting ===
             sort_by = st.selectbox("Sort by", options=["Score", "Comments"])
@@ -145,10 +140,6 @@ if st.button("Fetch Posts") and keyword:
             )
             st.altair_chart(chart, use_container_width=True)
 
-            # === Comment Distribution Histogram ===
-            st.markdown("### 📈 Comment Distribution")
-            st.bar_chart(df["Comments"])
-
             # === Word Cloud ===
             st.markdown("### ☁️ Word Cloud from Post Titles")
             wordcloud = generate_wordcloud(df["Title"].tolist())
@@ -156,6 +147,5 @@ if st.button("Fetch Posts") and keyword:
             ax.imshow(wordcloud, interpolation='bilinear')
             ax.axis("off")
             st.pyplot(fig)
-
         else:
             st.warning("No posts found. Try another keyword, subreddit, or time frame.")
