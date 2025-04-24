@@ -89,7 +89,7 @@ with col4:
 st.markdown("### 💬 Filter by Number of Comments")
 col5, col6 = st.columns(2)
 with col5:
-    comment_operator = st.selectbox("Operator", options=["=", "<", "<=", ">", ">="])
+    comment_operator = st.selectbox("Operator", options=[None, ">", "<"])
 with col6:
     comment_value = st.number_input("Number of Comments", min_value=0, step=1, value=0)
 
