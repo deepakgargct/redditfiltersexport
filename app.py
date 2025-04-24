@@ -7,7 +7,7 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import re
 
-# === Reddit API Setup using st.secrets ===
+# === Reddit API Setup ===
 reddit = praw.Reddit(
     client_id=st.secrets["client_id"],
     client_secret=st.secrets["client_secret"],
@@ -41,6 +41,7 @@ def get_reddit_posts(keyword, start_date, end_date, subreddits=None, comment_fil
                                 continue
                         posts.append({
                             "Title": submission.title,
+                            "Body": submission.selftext if submission.is_self else "",
                             "Score": submission.score,
                             "Upvote Ratio": submission.upvote_ratio,
                             "Comments": submission.num_comments,
@@ -88,7 +89,7 @@ with col4:
 st.markdown("### 💬 Filter by Number of Comments")
 col5, col6 = st.columns(2)
 with col5:
-    comment_operator = st.selectbox("Operator", options=[None, ">", "<"])
+    comment_operator = st.selectbox("Operator", options=["=", "<", "<=", ">", ">="])
 with col6:
     comment_value = st.number_input("Number of Comments", min_value=0, step=1, value=0)
 
@@ -139,6 +140,20 @@ if st.button("Fetch Posts") and keyword:
                 .properties(width="container")
             )
             st.altair_chart(chart, use_container_width=True)
+
+            # === Comment Distribution Histogram ===
+            st.markdown("### 🧮 Comment Distribution")
+            hist = (
+                alt.Chart(df)
+                .mark_bar()
+                .encode(
+                    alt.X("Comments:Q", bin=alt.Bin(maxbins=30), title="Number of Comments"),
+                    y='count()',
+                    tooltip=["count()"]
+                )
+                .properties(width="container")
+            )
+            st.altair_chart(hist, use_container_width=True)
 
             # === Word Cloud ===
             st.markdown("### ☁️ Word Cloud from Post Titles")
