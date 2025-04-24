@@ -35,9 +35,15 @@ def get_reddit_posts(keyword, start_date, end_date, subreddits=None, comment_fil
                         # Comment count filter
                         if comment_filter:
                             operator, value = comment_filter
-                            if operator == ">" and not (submission.num_comments > value):
+                            if operator == "=" and not (submission.num_comments == value):
+                                continue
+                            elif operator == ">" and not (submission.num_comments > value):
+                                continue
+                            elif operator == ">=" and not (submission.num_comments >= value):
                                 continue
                             elif operator == "<" and not (submission.num_comments < value):
+                                continue
+                            elif operator == "<=" and not (submission.num_comments <= value):
                                 continue
                         posts.append({
                             "Title": submission.title,
@@ -57,13 +63,13 @@ def get_reddit_posts(keyword, start_date, end_date, subreddits=None, comment_fil
 
 def generate_wordcloud(titles):
     text = ' '.join(titles)
-    text = re.sub(r"http\S+|[^A-Za-z\s]", "", text)  # Clean links and special chars
+    text = re.sub(r"http\S+|[^A-Za-z\s]", "", text)
     wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
     return wordcloud
 
 # === Streamlit UI ===
 st.set_page_config(page_title="Reddit Topic Explorer", layout="wide")
-st.title("🔍 Reddit Topic Explorer")
+st.title("\ud83d\udd0d Reddit Topic Explorer")
 
 # === Inputs ===
 col1, col2 = st.columns(2)
@@ -78,7 +84,7 @@ if len(selected_subreddits) > 5:
     selected_subreddits = selected_subreddits[:5]
 
 # === Date Range Filter ===
-st.markdown("### 📅 Filter by Date Range")
+st.markdown("### \ud83d\udcc5 Filter by Date Range")
 col3, col4 = st.columns(2)
 with col3:
     start_date = st.date_input("Start date", datetime.today() - timedelta(days=30))
@@ -86,16 +92,14 @@ with col4:
     end_date = st.date_input("End date", datetime.today())
 
 # === Comment Count Filter ===
-st.markdown("### 💬 Filter by Number of Comments")
+st.markdown("### \ud83d\udcac Filter by Number of Comments")
 col5, col6 = st.columns(2)
 with col5:
-    comment_operator = st.selectbox("Operator", options=[None, ">", "<"])
+    comment_operator = st.selectbox("Operator", options=["=", ">", ">=", "<", "<="])
 with col6:
     comment_value = st.number_input("Number of Comments", min_value=0, step=1, value=0)
 
-comment_filter = None
-if comment_operator and comment_value:
-    comment_filter = (comment_operator, comment_value)
+comment_filter = (comment_operator, comment_value) if comment_operator else None
 
 # === Fetch and Display ===
 if st.button("Fetch Posts") and keyword:
@@ -125,10 +129,10 @@ if st.button("Fetch Posts") and keyword:
 
             # === CSV Download ===
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download CSV", data=csv, file_name=f"{keyword}_reddit_posts.csv", mime='text/csv')
+            st.download_button("\ud83d\udcc5 Download CSV", data=csv, file_name=f"{keyword}_reddit_posts.csv", mime='text/csv')
 
             # === Bar Chart ===
-            st.markdown("### 📊 Post Activity Over Time")
+            st.markdown("### \ud83d\udcca Post Activity Over Time")
             chart = (
                 alt.Chart(df)
                 .mark_bar()
@@ -142,7 +146,7 @@ if st.button("Fetch Posts") and keyword:
             st.altair_chart(chart, use_container_width=True)
 
             # === Comment Distribution Histogram ===
-            st.markdown("### 🧮 Comment Distribution")
+            st.markdown("### \ud83e\uddf2 Comment Distribution")
             hist = (
                 alt.Chart(df)
                 .mark_bar()
@@ -156,7 +160,7 @@ if st.button("Fetch Posts") and keyword:
             st.altair_chart(hist, use_container_width=True)
 
             # === Word Cloud ===
-            st.markdown("### ☁️ Word Cloud from Post Titles")
+            st.markdown("### \u2601\ufe0f Word Cloud from Post Titles")
             wordcloud = generate_wordcloud(df["Title"].tolist())
             fig, ax = plt.subplots(figsize=(12, 6))
             ax.imshow(wordcloud, interpolation='bilinear')
