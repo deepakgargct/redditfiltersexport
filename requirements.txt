@@ -5,3 +5,4 @@ altair
 matplotlib
 wordcloud
 fuzzywuzzy 
+inflect
